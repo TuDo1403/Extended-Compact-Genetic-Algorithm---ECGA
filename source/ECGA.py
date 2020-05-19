@@ -2,45 +2,30 @@ import numpy as np
 import fitness_function as ff
 import math
 
+from numpy import arange
+from numpy import newaxis
 def get_MDL(pop, model):
     """ Compute minimum description length
     """
-    return get_CPC(pop, model) + get_MC(pop, model)
-
-
-def get_CPC(pop, model):
-    S = np.array(list(map(len, model)))
-    dec_events = [np.arange(2**s, dtype=np.uint8)[:, np.newaxis] for s in S]
-    bin_events = [np.unpackbits(de, axis=1) for de in dec_events]
-    num_groups = len(model)
-    events = [bin_events[i][:, -S[i]:] for i in range(num_groups)]
-    
-    sum_entropy = 0
+    # return get_CPC(pop, model) + get_MC(pop, model)
     N = len(pop)
-    universal_set = N + 1
+    S = np.array(list(map(len, model)))
+    MC = np.log2(N + 1) * np.sum(2**S - 1)
+
+    entropy = 0
+    num_groups = len(model)
+    events = [arange(2**S[i])[:, newaxis] >> np.arange(S[i])[::-1] & 1 for i in range(num_groups)]
     for i in range(num_groups):
         for event in events[i]:
             group = pop[:, model[i]]
-            prop = count_events(event, group) / universal_set
+            match = np.sum(group == event, axis=1)
+            prop = np.count_nonzero(match == len(event)) / (N+1)
             if prop != 0:
-                sum_entropy += prop * np.log2(1/prop)
-
+                entropy += prop * np.log2(1/prop)
             
-    return N * sum_entropy
+    CPC = N * entropy
+    return CPC + MC
 
-def count_events(event, group):
-    count = 0
-    for record in group:
-        if (event == record).all():
-            count += 1
-
-    return count
-
-
-def get_MC(pop, model):
-    n = len(pop)
-    s = np.array(list(map(len, model)))
-    return np.log2(n + 1) * np.sum(2**s - 1)
 
 def link_groups(model):
     models = []
@@ -108,11 +93,11 @@ def tournament_selection(pool_fitness, tournament_size, selection_size):
 def ECGA(user_config, func_inf, seed_num=1):
     np.random.seed(seed_num)
 
-    population = initialize_population(user_config.NUM_INDS, user_config.NUM_PARAMS)
+    population = initialize_population(user_config.POP_SIZE, user_config.PROBLEM_SIZE)
     pop_fitness = evaluate(population, func_inf.F_FUNC)
     num_eval_func_calls = len(pop_fitness)
 
-    pop_model = [[group] for group in np.arange(user_config.NUM_PARAMS)]
+    pop_model = [[group] for group in np.arange(user_config.PROBLEM_SIZE)]
 
     selection_size = len(population)
     
@@ -120,7 +105,7 @@ def ECGA(user_config, func_inf, seed_num=1):
     # print("#Gen 0:")
     # print(pop_fitness)
     generation = 0
-    while len(np.unique(pop_fitness)) != 1:
+    while not pop_converge(population):
         while len(pop_model) != 1:
             model = learn_marginal_product(population, pop_model)
             if converge(model, pop_model):
@@ -141,16 +126,16 @@ def ECGA(user_config, func_inf, seed_num=1):
 
         generation += 1
         
-        # print("#Gen {}:".format(generation))
-        # print(model)
+        print("#Gen {}:".format(generation))
+        print(model)
         # print(pop_fitness)
 
     # print("#Result:")
     # print(population)
     # print(pop_fitness)
         
-    optimized_solution_found = user_config.NUM_PARAMS == np.unique(pop_fitness)
-    print(optimized_solution_found[0], num_eval_func_calls)
+    optimized_solution_found = user_config.PROBLEM_SIZE == np.unique(pop_fitness)
+    print(population)
     return (optimized_solution_found[0], num_eval_func_calls)
 
 def converge(current_model, new_model):
@@ -159,19 +144,23 @@ def converge(current_model, new_model):
             return False
     return True
 
+def pop_converge(pop):
+    return len(np.unique(pop, axis=0)) == 1
+
 
 class ECGAConfig:
-    NUM_PARAMS = 4
-    NUM_INDS = 4
+    NAME = 'ECGA'
+    POP_SIZE = 4
+    PROBLEM_SIZE = 4
     TOURNAMENT_SIZE = 4
 
-    def __init__(self, num_inds, num_params, tournament_size=4):
-        self.NUM_PARAMS = num_params
-        self.NUM_INDS = num_inds
+    def __init__(self, pop_size, problem_size, tournament_size=4):
+        self.PROBLEM_SIZE = problem_size
+        self.POP_SIZE = pop_size
         self.TOURNAMENT_SIZE = tournament_size
 
 seed = 1
-user_config = ECGAConfig(20, 4, 4)
-func_inf = ff.FuncInf('Trap Four', ff.trap_four)
+user_config = ECGAConfig(1000, 20, 4)
+func_inf = ff.FuncInf('Trap Five', ff.trap_five)
 
 print(ECGA(user_config, func_inf))
