@@ -19,9 +19,9 @@ def get_MDL(pop, model):
         for event in events[i]:
             group = pop[:, model[i]]
             match = np.sum(group == event, axis=1)
-            prop = np.count_nonzero(match == len(event)) / (N+1)
-            if prop != 0:
-                entropy += prop * np.log2(1/prop)
+            prob = np.count_nonzero(match == len(event)) / (N+1)
+            if prob != 0:
+                entropy += prob * np.log2(1/prob)
             
     CPC = N * entropy
     return CPC + MC
