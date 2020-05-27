@@ -160,7 +160,7 @@ class ECGAConfig:
         self.TOURNAMENT_SIZE = tournament_size
 
 seed = 1
-user_config = ECGAConfig(1000, 20, 4)
+user_config = ECGAConfig(480, 20, 4)
 func_inf = ff.FuncInf('Trap Five', ff.trap_five)
 
 print(ECGA(user_config, func_inf))
